@@ -1,0 +1,340 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { albumCoverImages } from "../data/albumCoverImages";
+import { defaultRootCovers } from "../data/defaultCoverImages";
+import { AlbumNode, ImageSizeKey } from "../lib/types";
+import { buildAlbumTree, getNodeByPath } from "../lib/treeBuilder";
+import { useAuth } from "./AuthContext";
+
+interface GalleryContextValue {
+  root: AlbumNode | null;
+  currentNode: AlbumNode | null;
+  currentPath: string[];
+  isLoading: boolean;
+  error: string | null;
+  imageSize: ImageSizeKey;
+  imagePixelSize: number;
+  paginationEnabled: boolean;
+  currentPage: number;
+  photosPerPage: number;
+  albumCovers: Record<string, string>;
+  defaultRootCovers: Record<string, string>;
+  setImageSize: (size: ImageSizeKey) => void;
+  togglePagination: () => void;
+  setPaginationEnabled: (enabled: boolean) => void;
+  goToPath: (path: string[]) => void;
+  enterFolder: (folderName: string) => void;
+  goToPage: (page: number) => void;
+  refresh: () => Promise<void>;
+}
+
+const API_ENDPOINT = "https://7jaqpxmr1h.execute-api.us-west-2.amazonaws.com/prod";
+const IMAGE_PIXEL_SIZES: Record<ImageSizeKey, number> = {
+  small: 80,
+  medium: 150,
+  large: 220
+};
+
+const GalleryContext = createContext<GalleryContextValue | undefined>(undefined);
+
+export function GalleryProvider({ children }: { children: React.ReactNode }) {
+  const { token, logout } = useAuth();
+  const [root, setRoot] = useState<AlbumNode | null>(null);
+  const [currentPath, setCurrentPathState] = useState<string[]>(() => {
+    if (typeof window === "undefined") {
+      return ["public"];
+    }
+    return parsePathFromLocation() ?? ["public"];
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [imageSize, setImageSizeState] = useState<ImageSizeKey>("medium");
+  const [paginationEnabled, setPaginationEnabledState] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [photosPerPage, setPhotosPerPage] = useState(() => calculatePhotosPerPage(IMAGE_PIXEL_SIZES.medium));
+  const historyAction = useRef<"push" | "replace" | "none">("replace");
+  const currentPathRef = useRef(currentPath);
+
+  useEffect(() => {
+    currentPathRef.current = currentPath;
+  }, [currentPath]);
+
+  const fetchAlbums = useCallback(async (activeToken: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(API_ENDPOINT, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${activeToken}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError("Session expired. Please log in again.");
+          logout();
+        } else {
+          setError(`Unable to fetch albums (${response.status})`);
+        }
+        setRoot(null);
+        return;
+      }
+
+      const payload = await response.json();
+
+      if (payload?.statusCode && response.status === 200) {
+        setError("Authentication failed while loading albums.");
+        setRoot(null);
+        return;
+      }
+
+      if (!Array.isArray(payload)) {
+        setError("Unexpected API response format.");
+        setRoot(null);
+        return;
+      }
+
+      const tree = buildAlbumTree(payload);
+      setRoot(tree);
+      const desiredPath = normalizePath(currentPathRef.current);
+      const resolvedPath = getNodeByPath(tree, desiredPath) ? desiredPath : ["public"];
+      historyAction.current = "replace";
+      setCurrentPathState(resolvedPath);
+      setCurrentPage(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+      setRoot(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [logout]);
+
+  const refresh = useCallback(async () => {
+    if (!token) {
+      setRoot(null);
+      return;
+    }
+    await fetchAlbums(token);
+  }, [token, fetchAlbums]);
+
+  useEffect(() => {
+    if (!token) {
+      setRoot(null);
+      historyAction.current = "replace";
+      setCurrentPathState(["public"]);
+      setCurrentPage(1);
+      return;
+    }
+
+    fetchAlbums(token);
+  }, [token, fetchAlbums]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setPhotosPerPage(calculatePhotosPerPage(IMAGE_PIXEL_SIZES[imageSize]));
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [imageSize]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const statePath = Array.isArray(event.state?.path) ? (event.state.path as string[]) : null;
+      const locationPath = parsePathFromLocation();
+      const nextPath = normalizePath(statePath ?? locationPath ?? ["public"]);
+      historyAction.current = "none";
+      setCurrentPathState(nextPath);
+      setCurrentPage(1);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("path", currentPath.join("/"));
+    const state = { path: currentPath };
+    const action = historyAction.current;
+
+    if (action === "none") {
+      historyAction.current = "push";
+      return;
+    }
+
+    if (action === "replace") {
+      window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
+    }
+    historyAction.current = "push";
+  }, [currentPath]);
+
+  useEffect(() => {
+    if (!root || isLoading) {
+      return;
+    }
+
+    if (!getNodeByPath(root, currentPath)) {
+      historyAction.current = "replace";
+      setCurrentPathState(["public"]);
+      setCurrentPage(1);
+    }
+  }, [root, currentPath]);
+
+  const setImageSize = useCallback((size: ImageSizeKey) => {
+    setImageSizeState(size);
+    setCurrentPage(1);
+  }, []);
+
+  const updateCurrentPath = useCallback(
+    (recipe: (prev: string[]) => string[], action: "push" | "replace" | "none" = "push") => {
+      historyAction.current = action;
+      setCurrentPathState((prev) => normalizePath(recipe(prev)));
+      setCurrentPage(1);
+    },
+    []
+  );
+
+  const togglePagination = useCallback(() => {
+    setPaginationEnabledState((prev) => {
+      const next = !prev;
+      if (!next) {
+        setCurrentPage(1);
+      }
+      return next;
+    });
+  }, []);
+
+  const goToPath = useCallback((path: string[]) => {
+    updateCurrentPath(() => path);
+  }, [updateCurrentPath]);
+
+  const enterFolder = useCallback((folderName: string) => {
+    updateCurrentPath((prev) => prev.concat(folderName));
+  }, [updateCurrentPath]);
+
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const setPaginationEnabled = useCallback((enabled: boolean) => {
+    setPaginationEnabledState(enabled);
+    if (!enabled) {
+      setCurrentPage(1);
+    }
+  }, []);
+
+  const currentNode = useMemo(() => getNodeByPath(root, currentPath), [root, currentPath]);
+
+  const value = useMemo<GalleryContextValue>(
+    () => ({
+      root,
+      currentNode,
+      currentPath,
+      isLoading,
+      error,
+      imageSize,
+      imagePixelSize: IMAGE_PIXEL_SIZES[imageSize],
+      paginationEnabled,
+      currentPage,
+      photosPerPage,
+      albumCovers: albumCoverImages,
+      defaultRootCovers,
+      setImageSize,
+      togglePagination,
+      setPaginationEnabled,
+      goToPath,
+      enterFolder,
+      goToPage,
+      refresh
+    }),
+    [
+      root,
+      currentNode,
+      currentPath,
+      isLoading,
+      error,
+      imageSize,
+      paginationEnabled,
+      currentPage,
+      photosPerPage,
+      setImageSize,
+      togglePagination,
+      setPaginationEnabled,
+      goToPath,
+      enterFolder,
+      goToPage,
+      refresh
+    ]
+  );
+
+  return <GalleryContext.Provider value={value}>{children}</GalleryContext.Provider>;
+}
+
+export function useGallery() {
+  const context = useContext(GalleryContext);
+  if (!context) {
+    throw new Error("useGallery must be used within GalleryProvider");
+  }
+  return context;
+}
+
+function calculatePhotosPerPage(imageSize: number) {
+  if (typeof window === "undefined") {
+    return 30;
+  }
+  const pageWidth = window.innerWidth;
+  const pageHeight = window.innerHeight;
+  const imageWidth = imageSize * 1.8;
+  const imageHeight = imageSize * 1.7;
+  const imagesPerRow = Math.max(1, Math.floor(pageWidth / imageWidth));
+  const imagesPerColumn = Math.max(1, Math.floor(pageHeight / imageHeight));
+  return imagesPerRow * imagesPerColumn;
+}
+
+function parsePathFromLocation(): string[] | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const url = new URL(window.location.href);
+    const value = url.searchParams.get("path");
+    if (!value) {
+      return null;
+    }
+    const decoded = decodeURIComponent(value);
+    const segments = decoded
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    if (segments.length === 0) {
+      return null;
+    }
+    return normalizePath(segments);
+  } catch (error) {
+    return null;
+  }
+}
+
+function normalizePath(path: string[]): string[] {
+  const segments = path.map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) {
+    return ["public"];
+  }
+  if (segments[0] !== "public") {
+    return ["public", ...segments];
+  }
+  return [...segments];
+}
