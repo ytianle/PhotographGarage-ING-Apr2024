@@ -13,13 +13,16 @@ interface GalleryContextValue {
   error: string | null;
   imageSize: ImageSizeKey;
   imagePixelSize: number;
+  photoPixelSize: number;
   paginationEnabled: boolean;
+  showPhotoNames: boolean;
   currentPage: number;
   photosPerPage: number;
   albumCovers: Record<string, string>;
   defaultRootCovers: Record<string, string>;
   setImageSize: (size: ImageSizeKey) => void;
   togglePagination: () => void;
+  togglePhotoNames: () => void;
   setPaginationEnabled: (enabled: boolean) => void;
   goToPath: (path: string[]) => void;
   enterFolder: (folderName: string) => void;
@@ -28,10 +31,16 @@ interface GalleryContextValue {
 }
 
 const API_ENDPOINT = "https://7jaqpxmr1h.execute-api.us-west-2.amazonaws.com/prod";
-const IMAGE_PIXEL_SIZES: Record<ImageSizeKey, number> = {
+const FOLDER_PIXEL_SIZES: Record<ImageSizeKey, number> = {
   small: 80,
   medium: 150,
   large: 220
+};
+
+const PHOTO_PIXEL_SIZES: Record<ImageSizeKey, number> = {
+  small: 150,
+  medium: 220,
+  large: 320
 };
 
 const GalleryContext = createContext<GalleryContextValue | undefined>(undefined);
@@ -49,8 +58,9 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [imageSize, setImageSizeState] = useState<ImageSizeKey>("medium");
   const [paginationEnabled, setPaginationEnabledState] = useState(false);
+  const [showPhotoNames, setShowPhotoNames] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [photosPerPage, setPhotosPerPage] = useState(() => calculatePhotosPerPage(IMAGE_PIXEL_SIZES.medium));
+  const [photosPerPage, setPhotosPerPage] = useState(() => calculatePhotosPerPage(PHOTO_PIXEL_SIZES.medium));
   const historyAction = useRef<"push" | "replace" | "none">("replace");
   const currentPathRef = useRef(currentPath);
 
@@ -132,7 +142,7 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleResize = () => {
-      setPhotosPerPage(calculatePhotosPerPage(IMAGE_PIXEL_SIZES[imageSize]));
+      setPhotosPerPage(calculatePhotosPerPage(PHOTO_PIXEL_SIZES[imageSize]));
     };
 
     handleResize();
@@ -217,6 +227,10 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const togglePhotoNames = useCallback(() => {
+    setShowPhotoNames((prev) => !prev);
+  }, []);
+
   const goToPath = useCallback((path: string[]) => {
     updateCurrentPath(() => path);
   }, [updateCurrentPath]);
@@ -246,14 +260,17 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       error,
       imageSize,
-      imagePixelSize: IMAGE_PIXEL_SIZES[imageSize],
+      imagePixelSize: FOLDER_PIXEL_SIZES[imageSize],
+      photoPixelSize: PHOTO_PIXEL_SIZES[imageSize],
       paginationEnabled,
+      showPhotoNames,
       currentPage,
       photosPerPage,
       albumCovers: albumCoverImages,
       defaultRootCovers,
       setImageSize,
       togglePagination,
+      togglePhotoNames,
       setPaginationEnabled,
       goToPath,
       enterFolder,
@@ -268,10 +285,12 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
       error,
       imageSize,
       paginationEnabled,
+      showPhotoNames,
       currentPage,
       photosPerPage,
       setImageSize,
       togglePagination,
+      togglePhotoNames,
       setPaginationEnabled,
       goToPath,
       enterFolder,
@@ -297,11 +316,16 @@ function calculatePhotosPerPage(imageSize: number) {
   }
   const pageWidth = window.innerWidth;
   const pageHeight = window.innerHeight;
-  const imageWidth = imageSize * 1.8;
-  const imageHeight = imageSize * 1.7;
-  const imagesPerRow = Math.max(1, Math.floor(pageWidth / imageWidth));
-  const imagesPerColumn = Math.max(1, Math.floor(pageHeight / imageHeight));
-  return imagesPerRow * imagesPerColumn;
+
+  const horizontalGap = 28;
+  const verticalGap = 28;
+  const estimatedCardWidth = imageSize + horizontalGap;
+  const estimatedCardHeight = imageSize * 1.25 + verticalGap;
+
+  const imagesPerRow = Math.max(1, Math.floor(pageWidth / estimatedCardWidth));
+  const imagesPerColumn = Math.max(1, Math.floor(pageHeight / estimatedCardHeight));
+
+  return Math.min(300, Math.max(40, imagesPerRow * imagesPerColumn));
 }
 
 function parsePathFromLocation(): string[] | null {

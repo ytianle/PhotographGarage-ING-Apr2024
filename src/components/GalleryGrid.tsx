@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AlbumNode } from "../lib/types";
 import { useGallery } from "../context/GalleryContext";
 import { LazyImage } from "./LazyImage";
@@ -14,12 +14,39 @@ export function GalleryGrid() {
     currentPath,
     enterFolder,
     imagePixelSize,
+    photoPixelSize,
+    isLoading,
     paginationEnabled,
+    showPhotoNames,
     currentPage,
     photosPerPage,
     defaultRootCovers,
     albumCovers
   } = useGallery();
+
+  const folderTileSize = imagePixelSize;
+  const photoTileSize = Math.max(120, photoPixelSize);
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [layoutVars, setLayoutVars] = useState(() => ({
+    cols: 1,
+    gapPx: 24,
+    widthPx: photoTileSize
+  }));
+
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    visible: boolean;
+    text: string;
+    x: number;
+    y: number;
+  }>({ visible: false, text: "", x: 0, y: 0 });
+
+  const hideTooltip = () => {
+    setHoverTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+  };
+
+  const showTooltip = (text: string, x: number, y: number) => {
+    setHoverTooltip({ visible: true, text, x, y });
+  };
 
   const folderEntries = useMemo(() => {
     if (!currentNode) {
@@ -28,6 +55,29 @@ export function GalleryGrid() {
     const entries = Object.entries(currentNode.folders) as Array<[string, AlbumNode]>;
     return entries.sort((a, b) => b[0].localeCompare(a[0]));
   }, [currentNode]);
+
+  useEffect(() => {
+    const element = sectionRef.current;
+    if (!element) {
+      return;
+    }
+
+    const gapPx = 24;
+
+    const update = () => {
+      const available = element.clientWidth;
+      const estimatedCols = Math.floor((available + gapPx) / (photoTileSize + gapPx));
+      const cols = Math.max(1, estimatedCols);
+      const widthPx = cols * photoTileSize + Math.max(0, cols - 1) * gapPx;
+      setLayoutVars((prev) => (prev.cols === cols && prev.widthPx === widthPx ? prev : { cols, gapPx, widthPx }));
+    };
+
+    update();
+
+    const observer = new ResizeObserver(() => update());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [photoTileSize]);
 
   const totalPhotos = currentNode?.photos.length ?? 0;
 
@@ -47,79 +97,124 @@ export function GalleryGrid() {
   const fancyboxKey = useMemo(() => visiblePhotos.map((photo) => photo.originalUrl).join("|"), [visiblePhotos]);
   useFancybox([fancyboxKey]);
 
-  const showEmpty = folderEntries.length === 0 && visiblePhotos.length === 0;
+  const showEmpty = !isLoading && folderEntries.length === 0 && visiblePhotos.length === 0;
 
   const gridStyle = useMemo(
     () => ({
-      ["--thumb-size" as const]: `${Math.max(120, imagePixelSize)}px`
+      ["--thumb-size" as const]: `${photoTileSize}px`,
+      ["--grid-cols" as const]: `${layoutVars.cols}`,
+      ["--grid-gap" as const]: `${layoutVars.gapPx}px`,
+      ["--grid-width" as const]: `${layoutVars.widthPx}px`
     }),
-    [imagePixelSize]
+    [photoTileSize, layoutVars]
   );
 
   return (
     <>
-      <section className="gallery-grid" style={gridStyle}>
-        {folderEntries.map(([folderName, folderNode]) => {
-          const cover = resolveCover({ folderName, folderNode, currentPath, albumCovers, defaultRootCovers });
-          return (
-            <article
-              key={folderName}
-              className="folder-card"
-              style={{
-                backgroundImage: `url(${cover.url})`,
-                width: `${imagePixelSize}px`,
-                height: `${imagePixelSize}px`
-              }}
-              title={folderName}
-              onClick={() => enterFolder(folderName)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  enterFolder(folderName);
-                }
-              }}
-            >
-              {cover.showIcon && <div className="folder-card-icon" aria-hidden="true" />}
-              <div className="folder-card-label">{folderName}</div>
-            </article>
-          );
-        })}
-
-        {visiblePhotos.map((photo) => {
-          const info = metadata[photo.originalUrl];
-          const caption = info ? buildCaption(info) : undefined;
-
-          return (
-            <figure
-              key={photo.originalUrl}
-              className="photo-card"
-              style={{ width: `${imagePixelSize}px` }}
-            >
-              <a
-                href={photo.originalUrl}
-                data-fancybox="gallery"
-                data-caption={caption}
-                aria-label={`Open ${photo.name}`}
-              >
-                <LazyImage
-                  source={photo.previewUrl}
-                  alt={photo.name}
+      <section ref={sectionRef} className="gallery-grid" style={gridStyle}>
+        {hoverTooltip.visible && (
+          <div
+            className="cursor-tooltip"
+            role="tooltip"
+            style={{ left: hoverTooltip.x, top: hoverTooltip.y }}
+          >
+            {hoverTooltip.text}
+          </div>
+        )}
+        {folderEntries.length > 0 && (
+          <div className="folder-grid">
+            {folderEntries.map(([folderName, folderNode]) => {
+              const cover = resolveCover({ folderName, folderNode, currentPath, albumCovers, defaultRootCovers });
+              return (
+                <article
+                  key={folderName}
+                  className="folder-card"
                   style={{
-                    width: `${imagePixelSize}px`,
-                    height: "auto",
-                    borderRadius: "10px",
-                    margin: "10px auto"
+                    backgroundImage: `url("${cover.url}")`,
+                    width: `${folderTileSize}px`,
+                    height: `${folderTileSize}px`
                   }}
-                />
-              </a>
-              <figcaption>{formatPhotoName(photo.name)}</figcaption>
-            </figure>
-          );
-        })}
+                  title={folderName}
+                  onClick={() => {
+                    hideTooltip();
+                    enterFolder(folderName);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      hideTooltip();
+                      enterFolder(folderName);
+                    }
+                  }}
+                >
+                  {cover.showIcon && <div className="folder-card-icon" aria-hidden="true" />}
+                  <div
+                    className="folder-card-label"
+                    onMouseEnter={(event) => {
+                      showTooltip(folderName, event.clientX + 14, event.clientY + 14);
+                    }}
+                    onMouseMove={(event) => {
+                      setHoverTooltip((prev) =>
+                        prev.visible
+                          ? {
+                              ...prev,
+                              x: event.clientX + 14,
+                              y: event.clientY + 14
+                            }
+                          : prev
+                      );
+                    }}
+                    onMouseLeave={hideTooltip}
+                  >
+                    {folderName}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
-        {showEmpty && <p>No folders or photos here yet.</p>}
+        {visiblePhotos.length > 0 && (
+          <div className="photo-masonry" aria-label="Photos">
+            {visiblePhotos.map((photo) => {
+              const info = metadata[photo.originalUrl];
+              const caption = info ? buildCaption(info) : undefined;
+              const fullName = getFullPhotoName(photo.name);
+
+              return (
+                <figure key={photo.originalUrl} className="photo-card" title={fullName}>
+                  <a
+                    href={photo.originalUrl}
+                    data-fancybox="gallery"
+                    data-caption={caption}
+                    aria-label={`Open ${photo.name}`}
+                    title={fullName}
+                  >
+                    <LazyImage
+                      source={photo.previewUrl}
+                      alt={photo.name}
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        borderRadius: "10px"
+                      }}
+                    />
+                  </a>
+                  {showPhotoNames && <figcaption title={fullName}>{formatPhotoName(photo.name)}</figcaption>}
+                </figure>
+              );
+            })}
+          </div>
+        )}
+
+        {showEmpty && (
+          <div className="empty-state" role="status" aria-live="polite">
+            <div className="empty-state-gif" aria-hidden="true" />
+            <p className="sr-only">No folders or photos here yet.</p>
+          </div>
+        )}
       </section>
       <PaginationBar totalItems={totalPhotos} />
     </>
@@ -158,11 +253,27 @@ function resolveCover({
     }
   }
 
-  if (folderNode.photos[0]) {
-    return { url: folderNode.photos[0].previewUrl, showIcon: true };
+  const candidate = findFirstPhoto(folderNode);
+  if (candidate) {
+    return { url: candidate.previewUrl, showIcon: true };
   }
 
   return { url: "/unnamed.png", showIcon: true };
+}
+
+function findFirstPhoto(node: AlbumNode): AlbumNode["photos"][number] | null {
+  if (node.photos[0]) {
+    return node.photos[0];
+  }
+
+  for (const child of Object.values(node.folders)) {
+    const found = findFirstPhoto(child);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 function extractPublicBase(url: string) {
@@ -199,4 +310,9 @@ function formatPhotoName(name: string) {
   }
   const [prefix] = base.split("-");
   return `${prefix}.jpg`;
+}
+
+function getFullPhotoName(name: string) {
+  const [base] = name.split("?");
+  return base;
 }
