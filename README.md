@@ -2,9 +2,9 @@
 
 ## Overview
 
-The photograph garage now runs as a modern single-page application powered by React 18, Vite, and TypeScript. It still talks to the existing AWS backend (API Gateway, Lambda, S3) for authentication and album data, but the presentation layer has been rebuilt for faster navigation, responsive layouts, and richer interactions.
+The photograph garage runs as a modern single-page application powered by React 18, Vite, and TypeScript. It integrates with an existing backend for authentication and album data.
 
-Key front-end capabilities:
+Key capabilities:
 - JWT-based login overlay with automatic token expiry handling.
 - Dynamic album tree building with folder navigation and breadcrumb routing.
 - Responsive masonry-like photo grid with lazy-loading and Fancybox lightbox integration.
@@ -20,30 +20,40 @@ npm run build  # type-check and produce optimized production bundle
 npm run preview  # serve the production bundle locally
 ```
 
-All static assets (icons, gifs, album covers) live under `public/` and are served directly by Vite.
+Static assets (icons, gifs, album covers) live under `public/` and are served directly by Vite.
 
 ## Project Structure
 
 ```
+archive/                # Archived legacy root assets / one-off files
+backend/                # AWS Lambda / backend helpers (not part of Vite build)
+docs/                   # Screenshots and project docs
+legacy/                 # Pre-SPA static prototype (kept for reference)
 src/
-	App.tsx              # Top-level shell wiring auth + gallery contexts
-	components/          # LoginModal, ControlPanel, GalleryGrid, etc.
-	context/             # AuthProvider + GalleryProvider
-	data/                # Album cover lookups and default imagery
-	hooks/               # Lazy Fancybox binding and EXIF metadata cache
-	lib/                 # Tree builder + shared typing
-	styles/              # Global reset + app-specific styling
+App.tsx              	# Top-level shell wiring auth + gallery contexts
+components/          	# LoginModal, ControlPanel, GalleryGrid, etc.
+context/             	# AuthProvider + GalleryProvider
+data/                	# Album cover lookups and default imagery
+hooks/               	# Lazy Fancybox binding and EXIF metadata cache
+lib/                 	# Tree builder + shared typing
+styles/              	# Global reset + app-specific styling
 ```
 
-Legacy static assets (`index.js`, `index.css`) remain for reference but are no longer used by the SPA entrypoint.
+Legacy static assets (`legacy/index.js`, `legacy/index.css`) remain for reference but are no longer used by the SPA entrypoint.
 
 ## Notes
 
-- The gallery still targets `https://7jaqpxmr1h.execute-api.us-west-2.amazonaws.com/prod` for album listings and `https://x67i134qw3.execute-api.us-west-2.amazonaws.com/prod/login` for authentication. Update the constants in `src/context/AuthContext.tsx` and `src/context/GalleryContext.tsx` if endpoints change.
+- Backend endpoints and credentials are intentionally not documented here. Configure/update them in `src/context/AuthContext.tsx` and `src/context/GalleryContext.tsx`.
 - Thumbnail metadata (`*_info.json`) is loaded on demand with in-memory caching to keep popovers fast without spamming S3.
 - Fancybox styles are imported once in `App.tsx`. If you customize the lightbox, adjust `useFancybox.ts`.
 
 ## Screenshots
 
-Existing demo imagery in `Demos/` still represents the experience; regenerate as needed once the SPA is deployed.
+Existing demo imagery in `docs/screenshots/Demos/` still represents the experience; regenerate as needed once the SPA is deployed.
 
+![Photograph Garage SPA Demo 1](docs/screenshots/Demos/Snipaste_2025-03-20_20-06-37.png)
+![Photograph Garage SPA Demo 2](docs/screenshots/Demos/Snipaste_2025-03-20_20-06-57.png)
+![Photograph Garage SPA Demo 3](docs/screenshots/Demos/Snipaste_2025-03-20_20-07-13.png)
+![Photograph Garage SPA Demo 4](docs/screenshots/Demos/Snipaste_2025-03-20_20-08-06.png)
+![Photograph Garage SPA Demo 5](docs/screenshots/Demos/Snipaste_2025-03-20_20-08-49.png)
+![Photograph Garage SPA Demo 6](docs/screenshots/Demos/Snipaste_2025-03-20_20-10-16.png)
