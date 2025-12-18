@@ -123,16 +123,17 @@ export function GalleryGrid() {
         )}
         {folderEntries.length > 0 && (
           <div className="folder-grid">
-            {folderEntries.map(([folderName, folderNode]) => {
+            {folderEntries.map(([folderName, folderNode], idx) => {
               const cover = resolveCover({ folderName, folderNode, currentPath, albumCovers, defaultRootCovers });
               return (
                 <article
                   key={folderName}
-                  className="folder-card"
+                  className={`folder-card stagger-jump`}
                   style={{
                     backgroundImage: `url("${cover.url}")`,
                     width: `${folderTileSize}px`,
-                    height: `${folderTileSize}px`
+                    height: `${folderTileSize}px`,
+                    ["--jump-delay" as any]: `${idx * 40}ms`
                   }}
                   title={folderName}
                   onClick={() => {
@@ -178,13 +179,20 @@ export function GalleryGrid() {
 
         {visiblePhotos.length > 0 && (
           <div className="photo-masonry" aria-label="Photos">
-            {visiblePhotos.map((photo) => {
+            {visiblePhotos.map((photo, idx) => {
               const info = metadata[photo.originalUrl];
               const caption = info ? buildCaption(info) : undefined;
               const fullName = getFullPhotoName(photo.name);
 
               return (
-                <figure key={photo.originalUrl} className="photo-card" title={fullName}>
+                <figure
+                  key={photo.originalUrl}
+                  className={`photo-card stagger-jump`}
+                  title={fullName}
+                  style={{
+                    ["--jump-delay" as any]: `${idx * 40}ms`
+                  }}
+                >
                   <a
                     href={photo.originalUrl}
                     data-fancybox="gallery"
