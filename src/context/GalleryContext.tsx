@@ -10,6 +10,9 @@ interface GalleryContextValue {
   currentNode: AlbumNode | null;
   currentPath: string[];
   isLoading: boolean;
+  loadingProgress: number;
+  loadingTotal: number;
+  loadingProcessed: number;
   error: string | null;
   imageSize: ImageSizeKey;
   imagePixelSize: number;
@@ -31,6 +34,7 @@ interface GalleryContextValue {
 }
 
 const API_ENDPOINT = "https://7jaqpxmr1h.execute-api.us-west-2.amazonaws.com/prod";
+const CACHE_KEY = "gallery:flatList:v1";
 const FOLDER_PIXEL_SIZES: Record<ImageSizeKey, number> = {
   small: 80,
   medium: 150,
@@ -61,16 +65,37 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
   const [showPhotoNames, setShowPhotoNames] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [photosPerPage, setPhotosPerPage] = useState(() => calculatePhotosPerPage(PHOTO_PIXEL_SIZES.medium));
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingTotal, setLoadingTotal] = useState(0);
+  const [loadingProcessed, setLoadingProcessed] = useState(0);
   const historyAction = useRef<"push" | "replace" | "none">("replace");
   const currentPathRef = useRef(currentPath);
+  const loadingTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
 
   const fetchAlbums = useCallback(async (activeToken: string) => {
-    setIsLoading(true);
+    if (loadingTimeoutRef.current !== null) {
+      window.clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    const cachedList = readCachedList();
+    if (cachedList.length > 0) {
+      const tree = buildAlbumTree(cachedList);
+      setRoot(tree);
+      setLoadingProgress(100);
+      setLoadingTotal(cachedList.length);
+      setLoadingProcessed(cachedList.length);
+    }
+
+    const hasCache = cachedList.length > 0;
+    setIsLoading(!hasCache);
     setError(null);
+    setLoadingProgress(hasCache ? 100 : 0);
+    setLoadingTotal(hasCache ? cachedList.length : 0);
+    setLoadingProcessed(hasCache ? cachedList.length : 0);
 
     try {
       const response = await fetch(API_ENDPOINT, {
@@ -105,8 +130,22 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const tree = buildAlbumTree(payload);
+      const progressInterval = Math.max(1, Math.floor(payload.length / 100));
+      setLoadingTotal(payload.length);
+      setLoadingProcessed(0);
+      const tree = buildAlbumTree(payload, {
+        onProgress: (percent, processed) => {
+          if (!hasCache) {
+            setLoadingProgress(percent);
+            setLoadingProcessed(processed);
+          }
+        },
+        progressInterval
+      });
       setRoot(tree);
+      setLoadingProcessed(payload.length);
+      setLoadingProgress(100);
+      writeCachedList(payload);
       const desiredPath = normalizePath(currentPathRef.current);
       const resolvedPath = getNodeByPath(tree, desiredPath) ? desiredPath : ["public"];
       historyAction.current = "replace";
@@ -116,7 +155,16 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err.message : "Network error");
       setRoot(null);
     } finally {
-      setIsLoading(false);
+      setLoadingProgress(100);
+      setLoadingProcessed((prev) => (loadingTotal > 0 ? loadingTotal : prev));
+      if (hasCache) {
+        setIsLoading(false);
+      } else {
+        loadingTimeoutRef.current = window.setTimeout(() => {
+          setIsLoading(false);
+          loadingTimeoutRef.current = null;
+        }, 1000);
+      }
     }
   }, [logout]);
 
@@ -258,6 +306,9 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
       currentNode,
       currentPath,
       isLoading,
+      loadingProgress,
+      loadingTotal,
+      loadingProcessed,
       error,
       imageSize,
       imagePixelSize: FOLDER_PIXEL_SIZES[imageSize],
@@ -282,6 +333,9 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
       currentNode,
       currentPath,
       isLoading,
+      loadingProgress,
+      loadingTotal,
+      loadingProcessed,
       error,
       imageSize,
       paginationEnabled,
@@ -361,4 +415,31 @@ function normalizePath(path: string[]): string[] {
     return ["public", ...segments];
   }
   return [...segments];
+}
+
+function readCachedList(): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeCachedList(list: string[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(list));
+  } catch (error) {
+    // Ignore cache write errors.
+  }
 }

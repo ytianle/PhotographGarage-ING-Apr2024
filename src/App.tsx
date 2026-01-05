@@ -22,11 +22,16 @@ function App() {
 
 function Shell() {
   const { isAuthenticated } = useAuth();
-  const { isLoading, error, root } = useGallery();
+  const { isLoading, loadingProgress, loadingTotal, loadingProcessed, error, root } = useGallery();
 
   return (
     <div className="app-shell">
-      <Loader active={isLoading} />
+      <Loader
+        active={isLoading}
+        progress={loadingProgress}
+        total={loadingTotal}
+        processed={loadingProcessed}
+      />
       <LoginModal open={!isAuthenticated} />
       {isAuthenticated && root && <ControlPanel />}
       {isAuthenticated && <LogoutButton />}

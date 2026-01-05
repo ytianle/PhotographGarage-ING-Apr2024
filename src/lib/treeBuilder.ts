@@ -2,7 +2,12 @@ import { AlbumNode, PhotoAsset } from "./types";
 
 const IMAGE_EXTENSIONS = /\.(jpe?g|png)$/i;
 
-export function buildAlbumTree(urls: string[]): AlbumNode {
+type ProgressOptions = {
+  onProgress?: (percent: number, processed: number, total: number) => void;
+  progressInterval?: number;
+};
+
+export function buildAlbumTree(urls: string[], options: ProgressOptions = {}): AlbumNode {
   const root: AlbumNode = {
     name: "public",
     path: ["public"],
@@ -10,9 +15,16 @@ export function buildAlbumTree(urls: string[]): AlbumNode {
     photos: []
   };
 
-  urls.forEach((url) => {
+  const total = urls.length;
+  const onProgress = options.onProgress;
+  const progressInterval = options.progressInterval ?? 50;
+
+  urls.forEach((url, idx) => {
     const match = url.match(/public\/(.+)$/);
     if (!match) {
+      if (onProgress && (idx + 1) % progressInterval === 0) {
+        onProgress(Math.round(((idx + 1) / total) * 100), idx + 1, total);
+      }
       return;
     }
 
@@ -44,6 +56,10 @@ export function buildAlbumTree(urls: string[]): AlbumNode {
 
       node = node.folders[segment];
     });
+
+    if (onProgress && ((idx + 1) % progressInterval === 0 || idx + 1 === total)) {
+      onProgress(Math.round(((idx + 1) / total) * 100), idx + 1, total);
+    }
   });
 
   return root;

@@ -687,21 +687,82 @@
 .theater-loader .theater-spot {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
   z-index: 61;
   pointer-events: none;
   opacity: 0;
 }
 
 .theater-loader .duck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: clamp(140px, 22vw, 240px);
   height: clamp(140px, 22vw, 240px);
   background: url("/gifs/duck.gif") center / contain no-repeat;
   filter: drop-shadow(0 20px 30px rgba(0,0,0,0.6));
-  transform: translateY(6px) scale(0.98);
+  transform: translate(-50%, -50%) translateY(6px) scale(0.98);
   transition: transform 320ms cubic-bezier(.2,.9,.3,1), opacity 220ms ease;
   opacity: 0;
+}
+
+.theater-loader .loader-progress {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + clamp(90px, 12vw, 140px));
+  transform: translateX(-50%) translateY(8px);
+  display: grid;
+  gap: 8px;
+  min-width: min(280px, 70vw);
+  opacity: 0;
+  transition: transform 320ms cubic-bezier(.2,.9,.3,1), opacity 220ms ease;
+}
+
+.theater-loader .loader-progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.theater-loader .loader-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.65), rgba(255, 106, 203, 0.8));
+  width: 0%;
+  transition: width 480ms cubic-bezier(.22,.61,.36,1);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.35), 0 0 24px rgba(255, 106, 203, 0.25);
+  position: relative;
+}
+
+.theater-loader .loader-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.0), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.0));
+  transform: translateX(-60%);
+  animation: loader-shimmer 1.6s ease-in-out infinite;
+  opacity: 0.65;
+}
+
+@keyframes loader-shimmer {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+.theater-loader .loader-progress-label {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-align: center;
 }
 
 .theater-loader.active .theater-curtain.top {
@@ -718,7 +779,12 @@
 
 .theater-loader.active .duck {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translate(-50%, -50%) translateY(0) scale(1);
+}
+
+.theater-loader.active .loader-progress {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* Soft fade when hiding (reverse animation) */
