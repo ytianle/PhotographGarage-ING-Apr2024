@@ -407,6 +407,11 @@
   position: relative;
 }
 
+.fancybox__slide .fancybox__content {
+  position: relative;
+  z-index: 1;
+}
+
 .fancybox__slide.is-protected .fancybox__content {
   background-color: #000;
 }
@@ -442,6 +447,51 @@
 
 .fancybox__caption .caption-value {
   color: rgba(255, 255, 255, 0.62);
+}
+
+.fancybox__slide.is-switching-source {
+  position: relative;
+}
+
+.fancybox__slide.is-switching-source::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.6));
+  pointer-events: none;
+  z-index: 20;
+}
+
+.fancybox-source-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  z-index: 21;
+  pointer-events: none;
+}
+.fancybox-toggle-source {
+  width: auto;
+  min-width: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  border-radius: 999px;
+}
+
+.fancybox-toggle-source:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .lazy-image {

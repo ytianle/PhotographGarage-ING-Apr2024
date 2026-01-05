@@ -3,6 +3,7 @@ export type ImageSizeKey = "small" | "medium" | "large";
 export interface PhotoAsset {
   name: string;
   originalUrl: string;
+  middleUrl: string;
   previewUrl: string;
   infoUrl: string;
 }

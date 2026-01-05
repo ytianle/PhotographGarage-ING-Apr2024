@@ -1,3 +1,4 @@
+"""将 public 原图复制到 public_small，并生成压缩图和 EXIF 信息文件。"""
 import json
 import boto3
 import piexif

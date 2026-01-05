@@ -194,8 +194,10 @@ export function GalleryGrid() {
                   }}
                 >
                   <a
-                    href={photo.originalUrl}
+                    href={photo.middleUrl}
                     data-fancybox="gallery"
+                    data-fancybox-original={photo.originalUrl}
+                    data-fancybox-compressed={photo.middleUrl}
                     data-caption={caption}
                     aria-label={`Open ${photo.name}`}
                     title={fullName}

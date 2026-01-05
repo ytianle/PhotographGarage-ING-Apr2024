@@ -52,12 +52,16 @@ export function buildAlbumTree(urls: string[]): AlbumNode {
 function createPhotoAsset(originalUrl: string, path: string[]): PhotoAsset {
   const fileNameWithQuery = path[path.length - 1];
   const fileName = fileNameWithQuery.split("?")[0];
+  const middleUrl = originalUrl
+    .replace("/public/", "/public_middle/")
+    .replace(/\.[^.?]+(?=\?|$)/, ".webp");
   const previewUrl = originalUrl.replace("/public/", "/public_small/");
   const infoUrl = previewUrl.replace(/\.[^.]+$/, "_info.json");
 
   return {
     name: fileName,
     originalUrl,
+    middleUrl,
     previewUrl,
     infoUrl
   };
