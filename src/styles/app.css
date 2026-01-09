@@ -435,14 +435,53 @@
 }
 
 .fancybox__caption {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: fixed;
+  inset: 0;
   padding: 0;
   margin: 0;
   background: transparent;
   pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 30;
+}
+
+.fancybox__container:not(.is-info-visible) .fancybox__caption {
+  display: none;
+}
+
+.fancybox__container.is-info-visible .fancybox__caption {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.fancybox-info-block {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  transform: none;
+  font-size: 1.05em;
+  text-align: left;
+}
+
+.fancybox-toggle-info.f-button {
+  width: auto;
+  height: auto;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: none;
 }
 
 .fancybox__caption .caption-key {
@@ -1094,10 +1133,13 @@
   }
 
   .fancybox__caption {
-    position: static;
-    padding: 8px 12px;
+    position: fixed;
+    inset: 0;
+    padding: 0;
     background: transparent;
-    margin-bottom: 0;
+    margin: 0;
+    opacity: 0;
+    transform: translateY(8px);
   }
 
   .fancybox__caption .caption-key,
@@ -1124,9 +1166,9 @@
   }
 
   .fancybox__caption {
-    order: 2;
-    width: 100%;
-    margin-top: 8px;
+    order: 0;
+    width: auto;
+    margin-top: 0;
   }
 
   .fancybox__slide.is-protected::after {
@@ -1143,6 +1185,10 @@
     margin-left: 0;
     flex-basis: 100%;
     text-align: right;
+  }
+
+  .fancybox-toggle-info.f-button {
+    font-size: 16px;
   }
 
   .theater-loader .loader-progress {

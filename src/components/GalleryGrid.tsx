@@ -332,7 +332,7 @@ function buildCaption(info: Record<string, string>) {
     })
     .join("<br/>");
 
-  return `<div style="position:absolute;bottom:6%;left:3%;font-size:1.15em;text-align:left;">${content}</div>`;
+  return `<div class="fancybox-info-block">${content}</div>`;
 }
 
 function formatPhotoName(name: string) {

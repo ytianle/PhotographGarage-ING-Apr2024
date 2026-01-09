@@ -3,13 +3,18 @@ import { useEffect } from "react";
 import { Fancybox } from "@fancyapps/ui";
 
 const TOGGLE_BUTTON_CLASS = "fancybox-toggle-source";
+const INFO_BUTTON_CLASS = "fancybox-toggle-info";
 const PROGRESS_CLASS = "fancybox-source-progress";
 const LABEL_ORIGINAL = "View Original";
 const LABEL_COMPRESSED = "View Compressed";
+const LABEL_INFO_ON = "Hide Info";
+const LABEL_INFO_OFF = "Show Info";
+const INFO_ICON = "ⓘ";
 
 type SourceState = "original" | "compressed" | "unknown";
 const activeRequests = new WeakMap<any, XMLHttpRequest>();
 const slideSource = new WeakMap<any, SourceState>();
+let infoVisible = false;
 
 function getSlideSources(slide: any) {
   const trigger = slide?.triggerEl as HTMLElement | null;
@@ -36,6 +41,61 @@ function getStoredState(slide: any): SourceState {
 
 function setStoredState(slide: any, state: SourceState) {
   slideSource.set(slide, state);
+}
+
+function setInfoState(container: HTMLElement, next: boolean) {
+  infoVisible = next;
+  container.classList.toggle("is-info-visible", infoVisible);
+}
+
+function ensureInfoButton(fancybox: any) {
+  const container = fancybox?.container as HTMLElement | null;
+  if (!container) {
+    return null;
+  }
+  const existingButtons = Array.from(
+    container.querySelectorAll(`.${INFO_BUTTON_CLASS}`)
+  ) as HTMLButtonElement[];
+  const primaryButton = existingButtons[0] ?? null;
+  for (let i = 1; i < existingButtons.length; i += 1) {
+    existingButtons[i].remove();
+  }
+
+  const toolbar = container.querySelector(
+    ".fancybox__toolbar__column.is-right"
+  ) as HTMLElement | null;
+  if (!toolbar) {
+    return null;
+  }
+
+  let button = primaryButton;
+  if (button) {
+    if (button.parentElement !== toolbar) {
+      toolbar.prepend(button);
+    }
+    return button;
+  }
+
+  button = document.createElement("button");
+  button.type = "button";
+  button.className = `f-button ${INFO_BUTTON_CLASS}`;
+  button.setAttribute("aria-pressed", String(infoVisible));
+  button.textContent = INFO_ICON;
+  button.title = infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF;
+  button.setAttribute("aria-label", infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF);
+  toolbar.prepend(button);
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const next = !infoVisible;
+    setInfoState(container, next);
+    button.setAttribute("aria-pressed", String(infoVisible));
+    button.title = infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF;
+    button.setAttribute("aria-label", infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF);
+  });
+
+  return button;
 }
 
 function updateButtonLabel(button: HTMLButtonElement, state: SourceState) {
@@ -216,8 +276,19 @@ function ensureToggleButton(fancybox: any) {
 function syncToggleButton(fancybox: any) {
   const slide = fancybox.getSlide();
   const button = ensureToggleButton(fancybox);
+  const infoButton = ensureInfoButton(fancybox);
   if (!slide || !button) {
     return;
+  }
+
+  if (infoButton) {
+    const container = fancybox?.container as HTMLElement | null;
+    if (container) {
+      setInfoState(container, infoVisible);
+      infoButton.setAttribute("aria-pressed", String(infoVisible));
+      infoButton.title = infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF;
+      infoButton.setAttribute("aria-label", infoVisible ? LABEL_INFO_ON : LABEL_INFO_OFF);
+    }
   }
 
   const { original, compressed } = getSlideSources(slide);
