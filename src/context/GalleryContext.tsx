@@ -370,6 +370,7 @@ function calculatePhotosPerPage(imageSize: number) {
   }
   const pageWidth = window.innerWidth;
   const pageHeight = window.innerHeight;
+  const minPerPage = pageWidth <= 768 ? 12 : 40;
 
   const horizontalGap = 28;
   const verticalGap = 28;
@@ -379,7 +380,7 @@ function calculatePhotosPerPage(imageSize: number) {
   const imagesPerRow = Math.max(1, Math.floor(pageWidth / estimatedCardWidth));
   const imagesPerColumn = Math.max(1, Math.floor(pageHeight / estimatedCardHeight));
 
-  return Math.min(300, Math.max(40, imagesPerRow * imagesPerColumn));
+  return Math.min(300, Math.max(minPerPage, imagesPerRow * imagesPerColumn));
 }
 
 function parsePathFromLocation(): string[] | null {

@@ -135,15 +135,36 @@ function loadImageWithProgress(
 }
 
 function ensureToggleButton(fancybox: any) {
-  const toolbar = fancybox?.container?.querySelector(
+  const container = fancybox?.container as HTMLElement | null;
+  if (!container) {
+    return null;
+  }
+  const existingButtons = Array.from(
+    container.querySelectorAll(`.${TOGGLE_BUTTON_CLASS}`)
+  ) as HTMLButtonElement[];
+  const primaryButton = existingButtons[0] ?? null;
+  for (let i = 1; i < existingButtons.length; i += 1) {
+    existingButtons[i].remove();
+  }
+
+  const toolbar = container.querySelector(
     ".fancybox__toolbar__column.is-right"
+  ) as HTMLElement | null;
+  const leftToolbar = container.querySelector(
+    ".fancybox__toolbar__column.is-left"
   ) as HTMLElement | null;
   if (!toolbar) {
     return null;
   }
 
-  let button = toolbar.querySelector(`.${TOGGLE_BUTTON_CLASS}`) as HTMLButtonElement | null;
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  const target = isMobile ? toolbar : leftToolbar || toolbar;
+
+  let button = primaryButton;
   if (button) {
+    if (button.parentElement !== target) {
+      target.prepend(button);
+    }
     return button;
   }
 
@@ -152,7 +173,7 @@ function ensureToggleButton(fancybox: any) {
   button.className = `f-button ${TOGGLE_BUTTON_CLASS}`;
   button.textContent = LABEL_ORIGINAL;
   button.title = LABEL_ORIGINAL;
-  toolbar.prepend(button);
+  target.prepend(button);
 
   button.addEventListener("click", (event) => {
     event.preventDefault();
@@ -215,6 +236,19 @@ function syncToggleButton(fancybox: any) {
 
 export function useFancybox(deps: DependencyList) {
   useEffect(() => {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const toolbarDisplay = isMobile
+      ? {
+          left: ["infobar"],
+          middle: ["zoomIn", "zoomOut", "toggle1to1"],
+          right: ["slideshow", "thumbs", "close"]
+        }
+      : {
+          left: ["infobar"],
+          middle: ["zoomIn", "zoomOut", "toggle1to1", "rotateCCW", "rotateCW", "flipX", "flipY"],
+          right: ["slideshow", "thumbs", "close"]
+        };
+
     Fancybox.bind("[data-fancybox='gallery']", {
       loop: true,
       contentClick: "toggleCover",
@@ -225,11 +259,10 @@ export function useFancybox(deps: DependencyList) {
         protected: true
       },
       Toolbar: {
-        display: {
-          left: ["infobar"],
-          middle: ["zoomIn", "zoomOut", "toggle1to1", "rotateCCW", "rotateCW", "flipX", "flipY"],
-          right: ["slideshow", "thumbs", "close"]
-        }
+        display: toolbarDisplay
+      },
+      Thumbs: {
+        autoStart: !isMobile
       },
       on: {
         "Carousel.ready": (fancybox: any) => {

@@ -14,6 +14,7 @@ export function GalleryGrid() {
     currentPath,
     enterFolder,
     imagePixelSize,
+    imageSize,
     photoPixelSize,
     isLoading,
     paginationEnabled,
@@ -30,7 +31,8 @@ export function GalleryGrid() {
   const [layoutVars, setLayoutVars] = useState(() => ({
     cols: 1,
     gapPx: 24,
-    widthPx: photoTileSize
+    widthPx: photoTileSize,
+    folderCols: 1
   }));
 
   const [hoverTooltip, setHoverTooltip] = useState<{
@@ -66,10 +68,29 @@ export function GalleryGrid() {
 
     const update = () => {
       const available = element.clientWidth;
-      const estimatedCols = Math.floor((available + gapPx) / (photoTileSize + gapPx));
-      const cols = Math.max(1, estimatedCols);
-      const widthPx = cols * photoTileSize + Math.max(0, cols - 1) * gapPx;
-      setLayoutVars((prev) => (prev.cols === cols && prev.widthPx === widthPx ? prev : { cols, gapPx, widthPx }));
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      const folderColsBySize = {
+        small: 3,
+        medium: 3,
+        large: 2
+      } as const;
+      const mobileColsBySize = {
+        small: 4,
+        medium: 3,
+        large: 2
+      } as const;
+      const cols = isMobile
+        ? mobileColsBySize[imageSize]
+        : Math.max(1, Math.floor((available + gapPx) / (photoTileSize + gapPx)));
+      const folderCols = isMobile ? folderColsBySize[imageSize] : 1;
+      const widthPx = isMobile
+        ? available
+        : cols * photoTileSize + Math.max(0, cols - 1) * gapPx;
+      setLayoutVars((prev) =>
+        prev.cols === cols && prev.widthPx === widthPx && prev.folderCols === folderCols
+          ? prev
+          : { cols, gapPx, widthPx, folderCols }
+      );
     };
 
     update();
@@ -77,7 +98,7 @@ export function GalleryGrid() {
     const observer = new ResizeObserver(() => update());
     observer.observe(element);
     return () => observer.disconnect();
-  }, [photoTileSize]);
+  }, [photoTileSize, imageSize]);
 
   const totalPhotos = currentNode?.photos.length ?? 0;
 
@@ -104,7 +125,8 @@ export function GalleryGrid() {
       ["--thumb-size" as const]: `${photoTileSize}px`,
       ["--grid-cols" as const]: `${layoutVars.cols}`,
       ["--grid-gap" as const]: `${layoutVars.gapPx}px`,
-      ["--grid-width" as const]: `${layoutVars.widthPx}px`
+      ["--grid-width" as const]: `${layoutVars.widthPx}px`,
+      ["--folder-cols" as const]: `${layoutVars.folderCols}`
     }),
     [photoTileSize, layoutVars]
   );
