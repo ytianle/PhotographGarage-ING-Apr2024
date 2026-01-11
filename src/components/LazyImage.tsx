@@ -15,12 +15,22 @@ export function LazyImage({ source, className, onLoad, alt, ...rest }: LazyImage
       return;
     }
 
+    const shouldEagerLoad =
+      typeof window !== "undefined" && /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+
     const handleLoad = (event: Event) => {
       setIsLoaded(true);
       onLoad?.(event as unknown as SyntheticEvent<HTMLImageElement>);
     };
 
     imageEl.addEventListener("load", handleLoad);
+
+    if (shouldEagerLoad) {
+      imageEl.src = source;
+      return () => {
+        imageEl.removeEventListener("load", handleLoad);
+      };
+    }
 
     if ("IntersectionObserver" in window) {
       const observer = new IntersectionObserver(
@@ -50,5 +60,5 @@ export function LazyImage({ source, className, onLoad, alt, ...rest }: LazyImage
 
   const classes = ["lazy-image", isLoaded ? "loaded" : "", className ?? ""].filter(Boolean).join(" ");
 
-  return <img ref={imgRef} className={classes} alt={alt} {...rest} />;
+  return <img ref={imgRef} className={classes} alt={alt} loading="lazy" decoding="async" {...rest} />;
 }

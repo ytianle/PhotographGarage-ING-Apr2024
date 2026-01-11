@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AlbumNode } from "../lib/types";
 import { useGallery } from "../context/GalleryContext";
 import { LazyImage } from "./LazyImage";
@@ -34,6 +34,14 @@ export function GalleryGrid() {
     widthPx: photoTileSize,
     folderCols: 1
   }));
+  const masonryRef = useRef<HTMLDivElement | null>(null);
+  const cardRefs = useRef(new Map<string, HTMLFigureElement>());
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const [masonryState, setMasonryState] = useState(() => ({
+    height: 0,
+    cardWidth: 0,
+    positions: {} as Record<string, { x: number; y: number }>
+  }));
 
   const [hoverTooltip, setHoverTooltip] = useState<{
     visible: boolean;
@@ -64,11 +72,10 @@ export function GalleryGrid() {
       return;
     }
 
-    const gapPx = 24;
-
     const update = () => {
       const available = element.clientWidth;
       const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      const gapPx = isMobile ? 16 : 24;
       const folderColsBySize = {
         small: 3,
         medium: 3,
@@ -100,6 +107,36 @@ export function GalleryGrid() {
     return () => observer.disconnect();
   }, [photoTileSize, imageSize]);
 
+  useEffect(() => {
+    const element = masonryRef.current;
+    if (!element) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      setLayoutVersion((prev) => prev + 1);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const registerCardRef = useCallback((id: string) => {
+    return (node: HTMLFigureElement | null) => {
+      if (node) {
+        cardRefs.current.set(id, node);
+      } else {
+        cardRefs.current.delete(id);
+      }
+    };
+  }, []);
+
+  const handleImageLoad = useCallback(() => {
+    setLayoutVersion((prev) => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    setLayoutVersion((prev) => prev + 1);
+  }, [showPhotoNames]);
+
   const totalPhotos = currentNode?.photos.length ?? 0;
 
   const visiblePhotos = useMemo(() => {
@@ -130,6 +167,48 @@ export function GalleryGrid() {
     }),
     [photoTileSize, layoutVars]
   );
+
+  useLayoutEffect(() => {
+    const container = masonryRef.current;
+    if (!container) {
+      return;
+    }
+    if (visiblePhotos.length === 0) {
+      setMasonryState((prev) => (prev.height === 0 ? prev : { ...prev, height: 0, positions: {} }));
+      return;
+    }
+    const containerWidth = container.clientWidth;
+    if (!containerWidth) {
+      return;
+    }
+
+    const cols = Math.max(1, layoutVars.cols);
+    const gap = layoutVars.gapPx;
+    const cardWidth = Math.max(0, (containerWidth - gap * (cols - 1)) / cols);
+    if (Math.abs(masonryState.cardWidth - cardWidth) > 0.5) {
+      setMasonryState((prev) => ({ ...prev, cardWidth }));
+      return;
+    }
+    const colHeights = Array.from({ length: cols }, () => 0);
+    const nextPositions: Record<string, { x: number; y: number }> = {};
+
+    visiblePhotos.forEach((photo) => {
+      const card = cardRefs.current.get(photo.originalUrl);
+      if (!card) {
+        return;
+      }
+      const height = card.getBoundingClientRect().height;
+      const minHeight = Math.min(...colHeights);
+      const colIndex = colHeights.indexOf(minHeight);
+      const x = colIndex * (cardWidth + gap);
+      const y = colHeights[colIndex];
+      nextPositions[photo.originalUrl] = { x, y };
+      colHeights[colIndex] = y + height + gap;
+    });
+
+    const height = Math.max(0, Math.max(...colHeights) - gap);
+    setMasonryState({ height, cardWidth, positions: nextPositions });
+  }, [visiblePhotos, layoutVars.cols, layoutVars.gapPx, layoutVars.widthPx, layoutVersion, masonryState.cardWidth]);
 
   return (
     <>
@@ -200,18 +279,29 @@ export function GalleryGrid() {
         )}
 
         {visiblePhotos.length > 0 && (
-          <div className="photo-masonry" aria-label="Photos">
+          <div
+            ref={masonryRef}
+            className="photo-masonry"
+            aria-label="Photos"
+            style={{ height: masonryState.height ? `${masonryState.height}px` : undefined }}
+          >
             {visiblePhotos.map((photo, idx) => {
               const info = metadata[photo.originalUrl];
               const caption = info ? buildCaption(info) : undefined;
               const fullName = getFullPhotoName(photo.name);
+              const position = masonryState.positions[photo.originalUrl];
 
               return (
                 <figure
                   key={photo.originalUrl}
+                  ref={registerCardRef(photo.originalUrl)}
                   className={`photo-card stagger-jump`}
                   title={fullName}
                   style={{
+                    position: position ? "absolute" : "relative",
+                    left: position ? `${position.x}px` : undefined,
+                    top: position ? `${position.y}px` : undefined,
+                    width: masonryState.cardWidth ? `${masonryState.cardWidth}px` : "100%",
                     ["--jump-delay" as any]: `${idx * 40}ms`
                   }}
                 >
@@ -227,6 +317,7 @@ export function GalleryGrid() {
                     <LazyImage
                       source={photo.previewUrl}
                       alt={photo.name}
+                      onLoad={handleImageLoad}
                       style={{
                         width: "100%",
                         height: "auto",

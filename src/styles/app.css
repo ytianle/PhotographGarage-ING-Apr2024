@@ -286,8 +286,8 @@
 .photo-masonry {
   width: var(--grid-width, 100%);
   margin: 12px;
-  column-count: var(--grid-cols, 1);
-  column-gap: calc(var(--grid-gap, 24px) + 10px);
+  position: relative;
+  display: block;
 }
 
 .folder-card {
@@ -369,13 +369,12 @@
 }
 
 .photo-card {
-  margin: 0 0 calc(var(--grid-gap, 24px) + 10px);
+  margin: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   width: 100%;
-  break-inside: avoid;
   text-align: center;
 }
 
@@ -1079,8 +1078,6 @@
 
   .photo-masonry {
     margin: 8px auto;
-    column-count: var(--grid-cols, 1);
-    column-gap: 16px;
     width: min(100%, var(--grid-width, 100%));
   }
 
