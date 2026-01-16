@@ -13,10 +13,27 @@ INDEX_KEY = "public_small/photo_list_tracker.json"
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
 
 
+def iter_s3_records(event):
+    for record in event.get('Records', []):
+        if 's3' in record:
+            yield record
+            continue
+        sns = record.get('Sns')
+        if not sns:
+            continue
+        try:
+            message = json.loads(sns.get('Message', ''))
+        except json.JSONDecodeError:
+            continue
+        for inner in message.get('Records', []):
+            if 's3' in inner:
+                yield inner
+
+
 def lambda_handler(event, context):
     bucket_name = 'marcus-photograph-garage'  # 您的S3桶名
 
-    for record in event['Records']:
+    for record in iter_s3_records(event):
         eventName = unquote_plus(record['eventName'])
         photo_key = unquote_plus(record['s3']['object']['key'])  # 获取触发事件的图片路径
         if not photo_key.startswith('public/'):
@@ -67,6 +84,13 @@ def copy_folder_contents(bucket, folder_key, source_prefix, destination_prefix):
 
 
 def update_index_for_prefix(bucket, prefix, remove=False):
+    if remove:
+        existing = load_index(bucket)
+        base_url = f"https://{bucket}.s3.amazonaws.com/"
+        prefix_url = f"{base_url}{prefix}"
+        updated = [url for url in existing if not url.startswith(prefix_url)]
+        save_index(bucket, updated)
+        return
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     keys = [item['Key'] for item in response.get('Contents', [])]
     image_keys = [key for key in keys if is_image_key(key)]

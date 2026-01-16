@@ -22,6 +22,23 @@ s3 = boto3.client("s3")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"}
 
 
+def iter_s3_records(event):
+    for record in event.get("Records", []):
+        if "s3" in record:
+            yield record
+            continue
+        sns = record.get("Sns")
+        if not sns:
+            continue
+        try:
+            message = json.loads(sns.get("Message", ""))
+        except json.JSONDecodeError:
+            continue
+        for inner in message.get("Records", []):
+            if "s3" in inner:
+                yield inner
+
+
 def lambda_handler(event, context):
     bucket_name = os.environ.get("BUCKET_NAME", "marcus-photograph-garage")
     source_prefix = os.environ.get("SOURCE_PREFIX", "public")
@@ -37,7 +54,7 @@ def lambda_handler(event, context):
     quality_step = int(os.environ.get("QUALITY_STEP", "8"))
     max_quality_steps = int(os.environ.get("MAX_QUALITY_STEPS", "6"))
 
-    for record in event.get("Records", []):
+    for record in iter_s3_records(event):
         event_name = unquote_plus(record["eventName"])
         object_key = unquote_plus(record["s3"]["object"]["key"])
 
@@ -54,6 +71,9 @@ def lambda_handler(event, context):
                     max_dim,
                     min_target_ratio,
                     fallback_min_quality,
+                    large_image_mb,
+                    quality_step,
+                    max_quality_steps,
                 )
             else:
                 process_object(
@@ -67,6 +87,9 @@ def lambda_handler(event, context):
                     max_dim,
                     min_target_ratio,
                     fallback_min_quality,
+                    large_image_mb,
+                    quality_step,
+                    max_quality_steps,
                 )
         elif event_name.startswith("ObjectRemoved:"):
             delete_destination(bucket_name, object_key, source_prefix, destination_prefix)
@@ -106,6 +129,9 @@ def process_folder(
                 max_dim,
                 min_target_ratio,
                 fallback_min_quality,
+                large_image_mb,
+                quality_step,
+                max_quality_steps,
             )
 
 
