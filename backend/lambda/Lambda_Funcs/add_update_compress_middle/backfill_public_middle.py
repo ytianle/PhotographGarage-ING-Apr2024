@@ -7,6 +7,20 @@ Algorithm steps:
 5) If still > target: resize to max_dim (if larger), then repeat ladder.
 6) If resized result < target * min_target_ratio: raise quality back up.
 7) If already <= max_dim and still > target: continue down to fallback_min_quality.
+
+python backend/lambda/Lambda_Funcs/backfill_public_middle.py \
+  --bucket marcus-photograph-garage \
+  --source-prefix public \
+  --dest-prefix public_middle \
+  --target-size-kb 1024 \
+  --quality 86 \
+  --min-quality 60 \
+  --fallback-min-quality 40 \
+  --max-dim 3000 \
+  --min-target-ratio 0.6 \
+  --large-image-mb 25 \
+  --quality-step 8 \
+  --max-quality-steps 6
 """
 import argparse
 import io
