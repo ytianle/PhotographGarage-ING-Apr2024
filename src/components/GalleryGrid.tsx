@@ -58,6 +58,18 @@ export function GalleryGrid() {
     setHoverTooltip({ visible: true, text, x, y });
   };
 
+  const moveTooltip = (event: React.MouseEvent) => {
+    setHoverTooltip((prev) =>
+      prev.visible
+        ? {
+            ...prev,
+            x: event.clientX + 14,
+            y: event.clientY + 14
+          }
+        : prev
+    );
+  };
+
   const folderEntries = useMemo(() => {
     if (!currentNode) {
       return [] as Array<[string, AlbumNode]>;
@@ -257,17 +269,7 @@ export function GalleryGrid() {
                     onMouseEnter={(event) => {
                       showTooltip(folderName, event.clientX + 14, event.clientY + 14);
                     }}
-                    onMouseMove={(event) => {
-                      setHoverTooltip((prev) =>
-                        prev.visible
-                          ? {
-                              ...prev,
-                              x: event.clientX + 14,
-                              y: event.clientY + 14
-                            }
-                          : prev
-                      );
-                    }}
+                    onMouseMove={moveTooltip}
                     onMouseLeave={hideTooltip}
                   >
                     {folderName}
@@ -297,6 +299,11 @@ export function GalleryGrid() {
                   ref={registerCardRef(photo.originalUrl)}
                   className={`photo-card stagger-jump`}
                   title={fullName}
+                  onMouseEnter={(event) => {
+                    showTooltip(fullName, event.clientX + 14, event.clientY + 14);
+                  }}
+                  onMouseMove={moveTooltip}
+                  onMouseLeave={hideTooltip}
                   style={{
                     position: position ? "absolute" : "relative",
                     left: position ? `${position.x}px` : undefined,
