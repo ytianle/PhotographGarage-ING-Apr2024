@@ -307,9 +307,10 @@
   margin-bottom: 12px;
 }
 
-.folder-card:hover {
-  transform: scale(1.05);
+.folder-card.stagger-jump:hover {
+  transform: translateY(-2px) scale(1.03)!important;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.8);
+  z-index: 2;
 }
 
 .folder-card::after {
@@ -416,22 +417,29 @@
   z-index: 1;
 }
 
-.fancybox__slide.is-protected .fancybox__content {
-  background-color: #000;
-}
-
-.fancybox__slide.is-protected::after {
+.fancybox__content.is-watermarked::after {
   content: "";
   position: absolute;
-  right: 5%;
-  bottom: 6%;
-  width: 96px;
-  height: 96px;
-  background: url("/logo.png") center / contain no-repeat;
+  inset: 0;
+  background-image: url("/logo.png");
+  background-size: 96px 96px;
+  background-repeat: repeat;
+  mask-image: var(--watermark-mask, none);
+  mask-size: cover;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  -webkit-mask-image: var(--watermark-mask, none);
+  -webkit-mask-size: cover;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
   pointer-events: none;
-  opacity: 0.9;
-  z-index: 20;
+  opacity: 0.16;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.65))
+    drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+  mix-blend-mode: normal;
+  z-index: 2;
 }
+
 
 .fancybox__caption {
   position: fixed;
@@ -617,6 +625,29 @@
   box-shadow: 0 0 18px rgba(255, 0, 214, 0.16), 0 16px 30px rgba(0, 0, 0, 0.45);
 }
 
+.login-button {
+  position: fixed;
+  bottom: clamp(16px, 4vw, 28px);
+  right: clamp(16px, 5vw, 36px);
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 255, 255, 0.55);
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(0, 120, 255, 0.18));
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 0, 214, 0.18), 0 12px 24px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  z-index: 30;
+}
+
+.login-button:hover {
+  border-color: rgba(255, 0, 214, 0.55);
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.28), rgba(0, 120, 255, 0.26));
+  transform: translateY(-2px);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.2), 0 16px 30px rgba(0, 0, 0, 0.45);
+}
+
 .login-overlay {
   position: fixed;
   inset: 0;
@@ -628,7 +659,7 @@
 
 .login-modal {
   width: min(360px, 92vw);
-  background: rgba(168, 214, 255, 0.25);
+  background: rgba(39, 64, 85, 0.95);
   border: 4px solid rgba(0, 0, 0, 0.9);
   border-radius: 18px;
   padding: clamp(20px, 4vw, 32px);
@@ -670,6 +701,17 @@
   transform: translateY(-1px);
   border-color: rgba(255, 0, 214, 0.55);
   box-shadow: 0 0 18px rgba(0, 255, 255, 0.16), 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+.login-modal .login-skip {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.35);
+  text-transform: none;
+}
+
+.login-modal .login-skip:hover {
+  border-color: rgba(0, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .login-error {
@@ -1046,6 +1088,19 @@
     z-index: 60;
   }
 
+  .login-button {
+    position: fixed !important;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: 140px;
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 999px;
+    height: auto;
+    z-index: 60;
+  }
+
   .pagination-bar {
     position: fixed;
     left: 0;
@@ -1168,9 +1223,8 @@
     margin-top: 0;
   }
 
-  .fancybox__slide.is-protected::after {
-    width: 72px;
-    height: 72px;
+  .fancybox__content.is-watermarked::after {
+    background-size: 72px 72px;
   }
 
   .fancybox-toggle-source {
@@ -1203,6 +1257,10 @@
   }
 
   .logout-button {
+    margin-top: 8px;
+  }
+
+  .login-button {
     margin-top: 8px;
   }
 

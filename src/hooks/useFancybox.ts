@@ -14,7 +14,11 @@ const INFO_ICON = "ⓘ";
 type SourceState = "original" | "compressed" | "unknown";
 const activeRequests = new WeakMap<any, XMLHttpRequest>();
 const slideSource = new WeakMap<any, SourceState>();
+const watermarkMasks = new Map<string, string>();
 let infoVisible = false;
+let allowOriginalSource = true;
+let watermarkEnabled = false;
+let minimalUi = false;
 
 function getSlideSources(slide: any) {
   const trigger = slide?.triggerEl as HTMLElement | null;
@@ -118,6 +122,82 @@ function ensureProgressEl(slideEl: HTMLElement) {
   el.textContent = "0%";
   slideEl.appendChild(el);
   return el;
+}
+
+function setSlideWatermark(slide: any, enabled: boolean) {
+  const contentEl = slide?.contentEl as HTMLElement | undefined;
+  if (!contentEl) {
+    return;
+  }
+  contentEl.classList.toggle("is-watermarked", enabled);
+  if (!enabled) {
+    contentEl.style.removeProperty("--watermark-mask");
+  }
+}
+
+function applyWatermarkMask(slide: any) {
+  if (!watermarkEnabled) {
+    return;
+  }
+  const contentEl = slide?.contentEl as HTMLElement | undefined;
+  const img = contentEl?.querySelector("img") as HTMLImageElement | null;
+  if (!contentEl || !img) {
+    return;
+  }
+  const src = img.currentSrc || img.src;
+  if (!src) {
+    return;
+  }
+  const cached = watermarkMasks.get(src);
+  if (cached) {
+    contentEl.style.setProperty("--watermark-mask", `url("${cached}")`);
+    return;
+  }
+  if (!img.complete || img.naturalWidth === 0) {
+    img.addEventListener(
+      "load",
+      () => {
+        applyWatermarkMask(slide);
+      },
+      { once: true }
+    );
+    return;
+  }
+  try {
+    const maxSize = 360;
+    const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    ctx.drawImage(img, 0, 0, width, height);
+    const source = ctx.getImageData(0, 0, width, height);
+    const output = ctx.createImageData(width, height);
+    const data = source.data;
+    const out = output.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const alpha = Math.max(0, Math.min(255, Math.round(((luminance - 1000) / 1) * 255)));
+      out[i] = 255;
+      out[i + 1] = 255;
+      out[i + 2] = 255;
+      out[i + 3] = alpha;
+    }
+    ctx.putImageData(output, 0, 0);
+    const maskUrl = canvas.toDataURL("image/png");
+    watermarkMasks.set(src, maskUrl);
+    contentEl.style.setProperty("--watermark-mask", `url("${maskUrl}")`);
+  } catch {
+    contentEl.style.removeProperty("--watermark-mask");
+  }
 }
 
 function setSlideLoading(slide: any, isLoading: boolean) {
@@ -276,10 +356,13 @@ function ensureToggleButton(fancybox: any) {
 function syncToggleButton(fancybox: any) {
   const slide = fancybox.getSlide();
   const button = ensureToggleButton(fancybox);
-  const infoButton = ensureInfoButton(fancybox);
+  const infoButton = minimalUi ? null : ensureInfoButton(fancybox);
   if (!slide || !button) {
     return;
   }
+
+  setSlideWatermark(slide, watermarkEnabled);
+  applyWatermarkMask(slide);
 
   if (infoButton) {
     const container = fancybox?.container as HTMLElement | null;
@@ -291,6 +374,13 @@ function syncToggleButton(fancybox: any) {
     }
   }
 
+  if (!allowOriginalSource || minimalUi) {
+    button.disabled = true;
+    button.style.display = "none";
+    return;
+  }
+
+  button.style.display = "";
   const { original, compressed } = getSlideSources(slide);
   if (!original || !compressed) {
     button.disabled = true;
@@ -305,20 +395,28 @@ function syncToggleButton(fancybox: any) {
   updateButtonLabel(button, initialState);
 }
 
-export function useFancybox(deps: DependencyList) {
+export function useFancybox(
+  deps: DependencyList,
+  options?: { allowOriginal?: boolean; watermark?: boolean; minimalUi?: boolean }
+) {
   useEffect(() => {
+    allowOriginalSource = options?.allowOriginal ?? true;
+    watermarkEnabled = options?.watermark ?? false;
+    minimalUi = options?.minimalUi ?? false;
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const toolbarDisplay = isMobile
-      ? {
-          left: ["infobar"],
-          middle: ["zoomIn", "zoomOut", "toggle1to1"],
-          right: ["slideshow", "thumbs", "close"]
-        }
-      : {
-          left: ["infobar"],
-          middle: ["zoomIn", "zoomOut", "toggle1to1", "rotateCCW", "rotateCW", "flipX", "flipY"],
-          right: ["slideshow", "thumbs", "close"]
-        };
+    const toolbarDisplay = minimalUi
+      ? { left: [], middle: [], right: ["close"] }
+      : isMobile
+        ? {
+            left: ["infobar"],
+            middle: ["zoomIn", "zoomOut", "toggle1to1"],
+            right: ["slideshow", "thumbs", "close"]
+          }
+        : {
+            left: ["infobar"],
+            middle: ["zoomIn", "zoomOut", "toggle1to1", "rotateCCW", "rotateCW", "flipX", "flipY"],
+            right: ["slideshow", "thumbs", "close"]
+          };
 
     Fancybox.bind("[data-fancybox='gallery']", {
       loop: true,
@@ -333,7 +431,7 @@ export function useFancybox(deps: DependencyList) {
         display: toolbarDisplay
       },
       Thumbs: {
-        autoStart: !isMobile
+        autoStart: !isMobile && !minimalUi
       },
       on: {
         "Carousel.ready": (fancybox: any) => {

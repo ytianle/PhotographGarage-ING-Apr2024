@@ -3,9 +3,11 @@ import { useAuth } from "../context/AuthContext";
 
 interface LoginModalProps {
   open: boolean;
+  onSkip?: () => void;
+  onClose?: () => void;
 }
 
-export function LoginModal({ open }: LoginModalProps) {
+export function LoginModal({ open, onSkip, onClose }: LoginModalProps) {
   const { login, error, clearError, isLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +33,8 @@ export function LoginModal({ open }: LoginModalProps) {
   };
 
   return (
-    <div className="login-overlay">
-      <form className="login-modal" onSubmit={handleSubmit}>
+    <div className="login-overlay" onClick={onClose}>
+      <form className="login-modal" onSubmit={handleSubmit} onClick={(event) => event.stopPropagation()}>
         <h2>Hola! Please login</h2>
         <input
           type="text"
@@ -53,6 +55,11 @@ export function LoginModal({ open }: LoginModalProps) {
         <button type="submit" disabled={isLoading}>
           {isLoading ? "Logging in..." : "Log in"}
         </button>
+        {onSkip && (
+          <button type="button" className="login-skip" onClick={onSkip} disabled={isLoading}>
+            Continue as guest
+          </button>
+        )}
         <div className="login-error">{error}</div>
       </form>
     </div>

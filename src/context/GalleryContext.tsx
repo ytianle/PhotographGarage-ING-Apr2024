@@ -76,7 +76,7 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
     currentPathRef.current = currentPath;
   }, [currentPath]);
 
-  const fetchAlbums = useCallback(async (activeToken: string) => {
+  const fetchAlbums = useCallback(async (activeToken: string | null) => {
     if (loadingTimeoutRef.current !== null) {
       window.clearTimeout(loadingTimeoutRef.current);
       loadingTimeoutRef.current = null;
@@ -98,21 +98,26 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
     setLoadingProcessed(hasCache ? cachedList.length : 0);
 
     try {
+      const headers = activeToken ? { Authorization: `Bearer ${activeToken}` } : undefined;
       const response = await fetch(API_ENDPOINT, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${activeToken}`
-        }
+        headers
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          setError("Session expired. Please log in again.");
-          logout();
+          if (activeToken) {
+            setError("Session expired. Please log in again.");
+            logout();
+          } else {
+            setError("Log in to achieve full functionality.");
+          }
         } else {
           setError(`Unable to fetch albums (${response.status})`);
         }
-        setRoot(null);
+        if (!hasCache) {
+          setRoot(null);
+        }
         return;
       }
 
@@ -120,13 +125,17 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
 
       if (payload?.statusCode && response.status === 200) {
         setError("Authentication failed while loading albums.");
-        setRoot(null);
+        if (!hasCache) {
+          setRoot(null);
+        }
         return;
       }
 
       if (!Array.isArray(payload)) {
         setError("Unexpected API response format.");
-        setRoot(null);
+        if (!hasCache) {
+          setRoot(null);
+        }
         return;
       }
 
@@ -169,22 +178,15 @@ export function GalleryProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   const refresh = useCallback(async () => {
-    if (!token) {
-      setRoot(null);
-      return;
-    }
     await fetchAlbums(token);
   }, [token, fetchAlbums]);
 
   useEffect(() => {
     if (!token) {
-      setRoot(null);
       historyAction.current = "replace";
       setCurrentPathState(["public"]);
       setCurrentPage(1);
-      return;
     }
-
     fetchAlbums(token);
   }, [token, fetchAlbums]);
 

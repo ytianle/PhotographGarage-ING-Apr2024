@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AlbumNode } from "../lib/types";
 import { useGallery } from "../context/GalleryContext";
+import { useAuth } from "../context/AuthContext";
 import { LazyImage } from "./LazyImage";
 import { PaginationBar } from "./PaginationBar";
 import { useFancybox } from "../hooks/useFancybox";
@@ -9,6 +10,7 @@ import { usePhotoMetadata } from "../hooks/usePhotoMetadata";
 const ROOT_PATH = "public";
 
 export function GalleryGrid() {
+  const { isAuthenticated } = useAuth();
   const {
     currentNode,
     currentPath,
@@ -165,7 +167,11 @@ export function GalleryGrid() {
 
   const { metadata } = usePhotoMetadata(visiblePhotos);
   const fancyboxKey = useMemo(() => visiblePhotos.map((photo) => photo.originalUrl).join("|"), [visiblePhotos]);
-  useFancybox([fancyboxKey]);
+  useFancybox([fancyboxKey, isAuthenticated], {
+    allowOriginal: isAuthenticated,
+    watermark: !isAuthenticated,
+    minimalUi: !isAuthenticated
+  });
 
   const showEmpty = !isLoading && folderEntries.length === 0 && visiblePhotos.length === 0;
 
@@ -248,7 +254,7 @@ export function GalleryGrid() {
                     height: `${folderTileSize}px`,
                     ["--jump-delay" as any]: `${idx * 40}ms`
                   }}
-                  title={folderName}
+                  title={isAuthenticated ? folderName : undefined}
                   onClick={() => {
                     hideTooltip();
                     enterFolder(folderName);
@@ -266,11 +272,15 @@ export function GalleryGrid() {
                   {cover.showIcon && <div className="folder-card-icon" aria-hidden="true" />}
                   <div
                     className="folder-card-label"
-                    onMouseEnter={(event) => {
-                      showTooltip(folderName, event.clientX + 14, event.clientY + 14);
-                    }}
-                    onMouseMove={moveTooltip}
-                    onMouseLeave={hideTooltip}
+                    onMouseEnter={
+                      isAuthenticated
+                        ? (event) => {
+                            showTooltip(folderName, event.clientX + 14, event.clientY + 14);
+                          }
+                        : undefined
+                    }
+                    onMouseMove={isAuthenticated ? moveTooltip : undefined}
+                    onMouseLeave={isAuthenticated ? hideTooltip : undefined}
                   >
                     {folderName}
                   </div>
@@ -298,12 +308,16 @@ export function GalleryGrid() {
                   key={photo.originalUrl}
                   ref={registerCardRef(photo.originalUrl)}
                   className={`photo-card stagger-jump`}
-                  title={fullName}
-                  onMouseEnter={(event) => {
-                    showTooltip(fullName, event.clientX + 14, event.clientY + 14);
-                  }}
-                  onMouseMove={moveTooltip}
-                  onMouseLeave={hideTooltip}
+                  title={isAuthenticated ? fullName : undefined}
+                  onMouseEnter={
+                    isAuthenticated
+                      ? (event) => {
+                          showTooltip(fullName, event.clientX + 14, event.clientY + 14);
+                        }
+                      : undefined
+                  }
+                  onMouseMove={isAuthenticated ? moveTooltip : undefined}
+                  onMouseLeave={isAuthenticated ? hideTooltip : undefined}
                   style={{
                     position: position ? "absolute" : "relative",
                     left: position ? `${position.x}px` : undefined,
@@ -315,11 +329,11 @@ export function GalleryGrid() {
                   <a
                     href={photo.middleUrl}
                     data-fancybox="gallery"
-                    data-fancybox-original={photo.originalUrl}
+                    data-fancybox-original={isAuthenticated ? photo.originalUrl : undefined}
                     data-fancybox-compressed={photo.middleUrl}
                     data-caption={caption}
                     aria-label={`Open ${photo.name}`}
-                    title={fullName}
+                    title={isAuthenticated ? fullName : undefined}
                   >
                     <LazyImage
                       source={photo.previewUrl}
@@ -332,7 +346,11 @@ export function GalleryGrid() {
                       }}
                     />
                   </a>
-                  {showPhotoNames && <figcaption title={fullName}>{formatPhotoName(photo.name)}</figcaption>}
+                  {showPhotoNames && (
+                    <figcaption title={isAuthenticated ? fullName : undefined}>
+                      {formatPhotoName(photo.name)}
+                    </figcaption>
+                  )}
                 </figure>
               );
             })}
